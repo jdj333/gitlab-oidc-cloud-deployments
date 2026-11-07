@@ -1,0 +1,196 @@
+# Disabled until federation, dedicated storage, and GitLab protections are configured.
+# GitHub hosts this portfolio; import/mirror it to GitLab to execute deployment jobs.
+include:
+  - local: .gitlab/deny-probe.yml
+
+stages: [test, deploy]
+
+variables:
+  ENABLE_AWS_DEPLOY: "false"
+  ENABLE_AZURE_DEPLOY: "false"
+  ENABLE_GCP_DEPLOY: "false"
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - when: never
+
+unit-tests:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - python -m pip install -r requirements-dev.txt
+    - python -m unittest discover -s tests -v
+  needs:
+    - job: render-trust
+      artifacts: true
+
+render-trust:
+  stage: test
+  image:
+    name: hashicorp/terraform:1.9.8
+    entrypoint: [""]
+  script:
+    - terraform fmt -check -recursive terraform tests/fixtures
+    - terraform -chdir=tests/fixtures init -backend=false -input=false
+    - terraform -chdir=tests/fixtures apply -auto-approve -input=false
+    - mkdir -p .test-output
+    - terraform -chdir=tests/fixtures output -json > .test-output/trust.json
+  artifacts:
+    paths: [.test-output/trust.json]
+    expire_in: 1 hour
+
+terraform-checks:
+  stage: test
+  image:
+    name: hashicorp/terraform:1.9.8
+    entrypoint: [""]
+  parallel:
+    matrix:
+      - CLOUD: [aws, azure, gcp]
+  script:
+    - terraform -chdir=terraform/$CLOUD init -backend=false -input=false -lockfile=readonly
+    - terraform -chdir=terraform/$CLOUD validate
+    - terraform -chdir=terraform/$CLOUD test
+
+.deploy:
+  stage: deploy
+  timeout: 10 minutes
+  interruptible: false
+  dependencies: []
+  # OIDC assertions, cloud tokens, and CLI auth directories never become artifacts.
+  retry: 0
+
+deploy-aws-dev:
+  extends: .deploy
+  image:
+    name: public.ecr.aws/aws-cli/aws-cli:2.31.0
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  variables:
+    DEPLOY_ENV: dev
+  environment:
+    name: aws/dev
+    deployment_tier: development
+  resource_group: aws-dev
+  rules:
+    - if: '$ENABLE_AWS_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: on_success
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-aws.sh
+
+deploy-aws-prod:
+  extends: .deploy
+  image:
+    name: public.ecr.aws/aws-cli/aws-cli:2.31.0
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  variables:
+    DEPLOY_ENV: prod
+  environment:
+    name: aws/prod
+    deployment_tier: production
+  resource_group: aws-prod
+  rules:
+    - if: '$ENABLE_AWS_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-aws.sh
+
+deploy-azure-dev:
+  extends: .deploy
+  image:
+    name: mcr.microsoft.com/azure-cli:2.77.0
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: api://AzureADTokenExchange
+  variables:
+    DEPLOY_ENV: dev
+  environment:
+    name: azure/dev
+    deployment_tier: development
+  resource_group: azure-dev
+  rules:
+    - if: '$ENABLE_AZURE_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: on_success
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-azure.sh
+
+deploy-azure-prod:
+  extends: .deploy
+  image:
+    name: mcr.microsoft.com/azure-cli:2.77.0
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: api://AzureADTokenExchange
+  variables:
+    DEPLOY_ENV: prod
+  environment:
+    name: azure/prod
+    deployment_tier: production
+  resource_group: azure-prod
+  rules:
+    - if: '$ENABLE_AZURE_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-azure.sh
+
+deploy-gcp-dev:
+  extends: .deploy
+  image:
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:543.0.0-stable
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  variables:
+    DEPLOY_ENV: dev
+  environment:
+    name: gcp/dev
+    deployment_tier: development
+  resource_group: gcp-dev
+  rules:
+    - if: '$ENABLE_GCP_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: on_success
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-gcp.sh
+
+deploy-gcp-prod:
+  extends: .deploy
+  image:
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:543.0.0-stable
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  variables:
+    DEPLOY_ENV: prod
+  environment:
+    name: gcp/prod
+    deployment_tier: production
+  resource_group: gcp-prod
+  rules:
+    - if: '$ENABLE_GCP_DEPLOY == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG == null'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - bash scripts/deploy-gcp.sh
+

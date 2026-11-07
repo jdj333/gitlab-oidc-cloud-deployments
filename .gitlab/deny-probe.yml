@@ -1,0 +1,50 @@
+# Explicit opt-in. These jobs receive non-secret target IDs in unprotected variables.
+# They request credentials but never call a deployment API.
+probe-denied-aws:
+  stage: deploy
+  image: python:3.12-slim
+  timeout: 2 minutes
+  dependencies: []
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  rules:
+    - if: '$ENABLE_AWS_DENY_PROBE == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "oidc-deny-probe"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - python scripts/probe-denial.py aws
+
+probe-denied-azure:
+  stage: deploy
+  image: python:3.12-slim
+  timeout: 2 minutes
+  dependencies: []
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: api://AzureADTokenExchange
+  rules:
+    - if: '$ENABLE_AZURE_DENY_PROBE == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "oidc-deny-probe"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - python scripts/probe-denial.py azure
+
+probe-denied-gcp:
+  stage: deploy
+  image: python:3.12-slim
+  timeout: 2 minutes
+  dependencies: []
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  rules:
+    - if: '$ENABLE_GCP_DENY_PROBE == "true" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "oidc-deny-probe"'
+      when: manual
+      allow_failure: false
+    - when: never
+  script:
+    - python scripts/probe-denial.py gcp
+

@@ -1,0 +1,8 @@
+region              = "us-west-2"
+gitlab_project_path = "example-platform/gitlab-oidc-cloud-deployments"
+gitlab_project_id   = "12345678"
+gitlab_namespace_id = "123456"
+deployment_buckets = {
+  dev  = "example-gitlab-releases-dev"
+  prod = "example-gitlab-releases-prod"
+}

@@ -1,0 +1,18 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+resource_group_name = "rg-gitlab-identities"
+location            = "westus2"
+gitlab_project_path = "example-platform/gitlab-oidc-cloud-deployments"
+gitlab_project_id   = "12345678"
+gitlab_namespace_id = "123456"
+deployment_storage = {
+  dev = {
+    account_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-releases/providers/Microsoft.Storage/storageAccounts/examplereleasesdev"
+    account_name = "examplereleasesdev"
+    container    = "releases-dev"
+  }
+  prod = {
+    account_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-releases/providers/Microsoft.Storage/storageAccounts/examplereleasesprod"
+    account_name = "examplereleasesprod"
+    container    = "releases-prod"
+  }
+}
