@@ -38,3 +38,31 @@ run "reject_shared_storage" {
   variables { deployment_buckets = { dev = "shared-bucket", prod = "shared-bucket" } }
   expect_failures = [var.deployment_buckets]
 }
+
+# Realistic computed IDs keep mocked downstream resource validation meaningful.
+override_resource {
+  target = google_service_account.deploy["dev"]
+  values = {
+    name  = "projects/example-platform-sandbox/serviceAccounts/gl-12345678-dev@example-platform-sandbox.iam.gserviceaccount.com"
+    email = "gl-12345678-dev@example-platform-sandbox.iam.gserviceaccount.com"
+  }
+}
+override_resource {
+  target = google_iam_workload_identity_pool.gitlab["dev"]
+  values = {
+    name = "projects/123456789012/locations/global/workloadIdentityPools/gl-12345678-dev"
+  }
+}
+override_resource {
+  target = google_service_account.deploy["prod"]
+  values = {
+    name  = "projects/example-platform-sandbox/serviceAccounts/gl-12345678-prod@example-platform-sandbox.iam.gserviceaccount.com"
+    email = "gl-12345678-prod@example-platform-sandbox.iam.gserviceaccount.com"
+  }
+}
+override_resource {
+  target = google_iam_workload_identity_pool.gitlab["prod"]
+  values = {
+    name = "projects/123456789012/locations/global/workloadIdentityPools/gl-12345678-prod"
+  }
+}

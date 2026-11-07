@@ -51,3 +51,23 @@ run "reject_shared_storage" {
   }
   expect_failures = [var.deployment_storage]
 }
+
+# Realistic computed IDs keep mocked downstream resource validation meaningful.
+override_resource {
+  target = azurerm_user_assigned_identity.deploy["dev"]
+  values = {
+    id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-gitlab-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/gitlab-12345678-dev"
+    principal_id = "00000000-0000-0000-0000-000000000001"
+    client_id    = "10000000-0000-0000-0000-000000000001"
+    tenant_id    = "20000000-0000-0000-0000-000000000000"
+  }
+}
+override_resource {
+  target = azurerm_user_assigned_identity.deploy["prod"]
+  values = {
+    id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-gitlab-identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/gitlab-12345678-prod"
+    principal_id = "00000000-0000-0000-0000-000000000002"
+    client_id    = "10000000-0000-0000-0000-000000000002"
+    tenant_id    = "20000000-0000-0000-0000-000000000000"
+  }
+}
